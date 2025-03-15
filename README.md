@@ -1,51 +1,47 @@
-# steppsPS
+#Detecção de Classes em Vídeo com YOLOv11 e Streamlit
+Este aplicativo Streamlit permite que você faça upload de um vídeo MP4 e de um arquivo de modelo YOLOv11 (.pt). Ele processa o vídeo para detectar várias classes (objetos) usando o modelo YOLOv11, exibe os quadros anotados e calcula a duração total de cada classe detectada no vídeo.
 
-Detecção de Classes em Vídeo com YOLOv11
-Este projeto é uma aplicação Streamlit que permite carregar um vídeo MP4, processá-lo usando um modelo YOLOv11 pré-treinado e exibir a duração total (em segundos) que cada classe aparece no vídeo. O modelo é carregado localmente a partir de um arquivo .pt.
+##Funcionalidades:
+Faça o upload de um arquivo de modelo YOLOv11 (.pt).
+Faça o upload de um arquivo de vídeo MP4 para detecção de classes.
+Exiba os quadros anotados com caixas delimitadoras e rótulos de classe em tempo real.
+Calcule e exiba a duração total de cada classe detectada no vídeo.
 
-Requisitos
-Antes de executar o aplicativo, certifique-se de ter instalado as seguintes bibliotecas:
 
-bash
-Copy
-pip install streamlit ultralytics opencv-python
-Como Usar
-Coloque o Modelo na Pasta:
+##Requisitos:
+Python 3.x
+Streamlit
+OpenCV
+PyTorch
+Ultralytics YOLOv11
+Instalação
+Clone este repositório:
 
-Certifique-se de que o arquivo do modelo YOLOv11 (por exemplo, yolo11n.pt) esteja na mesma pasta do código.
 
-Execute o Aplicativo:
+git clone <url-do-repositório>
+cd <diretório-do-repositório>
+Instale as dependências necessárias:
 
-No terminal, navegue até a pasta do projeto e execute o seguinte comando:
+###Instale as dependências usando pip:
+pip install streamlit opencv-python ultralytics
 
-bash
-Copy
-streamlit run app_yolov11.py
-Carregue um Vídeo:
+###Baixe o modelo YOLOv11:
 
-Na interface do Streamlit, carregue um vídeo no formato MP4.
+Certifique-se de ter um arquivo de modelo YOLOv11 (.pt). Este arquivo de modelo deve ser compatível com o conteúdo do vídeo que você deseja processar.
+Execute o aplicativo:
 
-Processe o Vídeo:
+###Inicie o aplicativo Streamlit com o seguinte comando:
 
-Clique no botão "Processar Vídeo" para iniciar a detecção de classes.
+streamlit run app.py
 
-O vídeo será exibido com as detecções em tempo real.
+###Como Usar:
+###Faça o upload do Modelo YOLOv11:
 
-Após o processamento, a duração total de cada classe será exibida.
+Certifique-se de que seu arquivo de modelo está no mesmo diretório que o aplicativo ou forneça seu caminho.
+O aplicativo tentará carregar o modelo do caminho especificado (model_path), sendo o caminho padrão finalW.pt.
+Faça o upload do Vídeo:
 
-Exemplo de Saída
-Após o processamento, o aplicativo exibirá algo como:
+Clique no botão "Carregue um vídeo MP4" e selecione um arquivo de vídeo MP4 do seu computador.
+Processar o Vídeo:
 
-Copy
-Duração Total de Cada Classe:
-Classe pessoa: 12.34 segundos
-Classe carro: 8.76 segundos
-Estrutura do Projeto
-app_yolov11.py: Código principal do aplicativo Streamlit.
-
-yolo11n.pt: Arquivo do modelo YOLOv11 (deve estar na mesma pasta do código).
-
-Observações
-O aplicativo processa o vídeo em tempo real, o que pode ser lento para vídeos longos. Para melhor desempenho, use uma GPU.
-
-O aplicativo suporta vídeos no formato MP4. Para outros formatos, ajuste o código.
+Após o upload do vídeo, clique no botão "Processar Vídeo" para começar a detecção de classes no vídeo.
