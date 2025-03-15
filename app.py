@@ -59,7 +59,7 @@ def process_video(model, video_path):
 def main():
     st.title("Detecção de Classes em Vídeo com YOLOv11")
 
-    model_path = "yolo11n.pt"  
+    model_path = "finalW.pt"  
     model = load_model(model_path)
     st.success("Modelo carregado com sucesso!")
 
