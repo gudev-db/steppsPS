@@ -11,6 +11,10 @@ def load_model(model_path):
 
 def process_video(model, video_path):
     cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        st.error("Erro ao abrir o vídeo. Verifique o formato do arquivo.")
+        return {}
+
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = 0
     class_appearances = defaultdict(list)
@@ -60,6 +64,10 @@ def main():
     st.title("Detecção de Classes em Vídeo com YOLOv11")
 
     model_path = "finalW.pt"  
+    if not os.path.exists(model_path):
+        st.error(f"Modelo não encontrado no caminho: {model_path}")
+        return
+
     model = load_model(model_path)
     st.success("Modelo carregado com sucesso!")
 
