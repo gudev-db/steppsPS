@@ -1,105 +1,127 @@
-import cv2
-import time
 import streamlit as st
-from ultralytics import YOLO
+import cv2
+import google.generativeai as genai
+from PIL import Image
+import io
 import tempfile
 import os
+import time
 
-# Carregar o modelo YOLO treinado
-model = YOLO('classW.pt')  # Substitua pelo caminho correto para o seu modelo treinado
+# Configuração do Gemini API
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=gemini_api_key)
 
-# Função para processar o vídeo e detectar as ações
-def process_video(video_file):
+# Inicializa os modelos do Gemini
+modelo_vision = genai.GenerativeModel(
+    "gemini-2.0-flash",
+    generation_config={
+        "temperature": 0.1  # Ajuste a temperatura aqui
+    }
+)  # Modelo para imagens
+modelo_texto = genai.GenerativeModel("gemini-1.5-flash")  # Modelo para texto
+
+# Guias do cliente (feedbacks do cliente)
+guias = """[Guia de comentários do cliente]"""
+
+# Função para processar o vídeo e identificar ações com LLM
+def processar_video_com_llm(uploaded_video):
     # Criar um arquivo temporário para o vídeo
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_file.write(video_file.read())
+        temp_file.write(uploaded_video.read())
         temp_file_path = temp_file.name
-    
-    # Abrir o vídeo usando o OpenCV
+
+    # Abrir o vídeo com OpenCV
     cap = cv2.VideoCapture(temp_file_path)
-    frame_rate = cap.get(cv2.CAP_PROP_FPS)  # Taxa de quadros do vídeo
-    duration = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) / frame_rate  # Duração total do vídeo
     
-    action_times = []  # Lista para armazenar as ações detectadas e seus tempos
-    action_durations = []  # Lista para armazenar as durações das ações
-    current_action = None
-    start_time = None
+    action_report = []  # Lista para armazenar as ações detectadas
     
+    # Definir as ações possíveis
+    actions = ['ApplyEyeMakeup', 'ApplyLipstick', 'BlowDryHair', 'BrushingTeeth', 'Haircut']
+
+    # Iterar sobre os quadros do vídeo
     while True:
         ret, frame = cap.read()
         if not ret:
             break
         
-        # Detectar a classe da ação no quadro atual
-        results = model(frame)  # Detecção no frame (classificação)
+        # Processar o quadro: gerar uma descrição (por exemplo, a partir de características da imagem)
+        # Você pode integrar o modelo de detecção de objetos aqui ou gerar um resumo simples do quadro.
+        # Aqui vamos usar o modelo LLM para descrever o que acontece no quadro.
         
-        # Imprimir a estrutura do retorno para depuração
-        print("Estrutura de results:", results)  # Imprimir o retorno para ver como está
+        # Convertemos o quadro para uma imagem que pode ser usada na LLM
+        pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        img_byte_arr = io.BytesIO()
+        pil_img.save(img_byte_arr, format="PNG")
+        img_bytes = img_byte_arr.getvalue()
         
-        # Verificar se há resultados e obter as probabilidades
-        if hasattr(results, 'probs') and len(results.probs) > 0:
-            probs = results.probs[0]  # Probabilidades para o primeiro (e único) quadro
-            
-            # Obter a classe com maior probabilidade
-            predicted_class_idx = probs.argmax()  # Índice da classe com maior probabilidade
-            predicted_class = results.names[predicted_class_idx]  # Nome da classe predita
-            confidence = probs[predicted_class_idx]  # Confiança da predição
-            
-            # Verificar se houve uma mudança na ação
-            if predicted_class != current_action:
-                if current_action is not None and start_time is not None:
-                    # Armazenar a ação anterior e sua duração
-                    action_times.append((current_action, start_time))
-                    action_durations.append(time.time() - start_time)
-                
-                # Atualizar a ação atual
-                current_action = predicted_class
-                start_time = time.time()  # Iniciar o tempo da nova ação
-        else:
-            print("Nenhuma probabilidade detectada no quadro")  # Caso não haja probabilidades
+        # Gerar uma descrição do quadro usando a LLM (modelo de visão)
+        prompt = f"Descreva detalhadamente o que está acontecendo nesta imagem. As ações possíveis são: {', '.join(actions)}. A imagem é uma sequência de um vídeo."
+        
+        try:
+            with st.spinner('Analisando o vídeo...'):
+                resposta = modelo_vision.generate_content(
+                    contents=[prompt, {"mime_type": "image/png", "data": img_bytes}]
+                )
+                descricao_imagem = resposta.text  # A descrição da imagem gerada pela LLM
 
-        time.sleep(1 / frame_rate)  # Atraso para simular a taxa de quadros
-    
-    # Adicionar a última ação detectada
-    if current_action is not None and start_time is not None:
-        action_times.append((current_action, start_time))
-        action_durations.append(time.time() - start_time)
-    
+                # Usamos a LLM para determinar a ação com base na descrição
+                action_predicted = None
+                for action in actions:
+                    if action.lower() in descricao_imagem.lower():
+                        action_predicted = action
+                        break
+
+                # Armazenar a ação detectada
+                if action_predicted:
+                    action_report.append(action_predicted)
+                else:
+                    action_report.append("Ação não detectada")
+
+                # Exibe a descrição e a ação detectada
+                st.write(f"Descrição do quadro: {descricao_imagem}")
+                st.write(f"Ação detectada: {action_predicted}")
+
+                # Opcional: Atrasar um pouco para simular a taxa de quadros
+                time.sleep(1 / cap.get(cv2.CAP_PROP_FPS))
+        
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao processar o quadro: {e}")
+            break
+
     cap.release()
-    
-    # Limpar o arquivo temporário
     os.remove(temp_file_path)
-    
-    # Gerar o relatório de ações e durações
-    action_report = {}
-    for action, start in zip(action_times, action_durations):
-        action_report[action[0]] = round(start, 2)
-    
-    return action_report, action_durations
+    return action_report
 
-# Interface Streamlit
-st.title('Detecção de Ações Humanas em Vídeos')
+# Função para exibir o vídeo e processar
+def alinhar_video():
+    st.subheader('Aprovação de Criativos (Vídeo)')
 
-# Carregar o vídeo
-uploaded_video = st.file_uploader("Faça upload de um vídeo", type=["mp4", "mov", "avi"])
+    # Criação de um estado para controlar o vídeo carregado
+    if 'video' not in st.session_state:
+        st.session_state.video = None
 
-if uploaded_video is not None:
-    # Exibir o vídeo carregado
-    st.video(uploaded_video)
-    
-    # Processar o vídeo e obter as ações e durações
-    action_report, action_durations = process_video(uploaded_video)
-    
-    # Exibir as ações detectadas
-    st.write("Ações Detectadas:")
-    for action, duration in zip(action_report.keys(), action_durations):
-        st.write(f"{action}: {round(duration, 2)} segundos")
-    
-    # Gerar um arquivo de relatório
-    report_file = "action_report.txt"
-    with open(report_file, "w") as f:
-        for action, duration in zip(action_report.keys(), action_durations):
-            f.write(f"{action}: {round(duration, 2)} segundos\n")
-    
-    # Botão para download do relatório
-    st.download_button("Baixar Relatório", report_file)
+    # Upload do vídeo
+    uploaded_video = st.file_uploader("Escolha um vídeo", type=["mp4", "avi"])
+    if uploaded_video is not None:
+        # Exibe o vídeo carregado
+        st.video(uploaded_video)
+
+        # Processa o vídeo e analisa as ações
+        action_report = processar_video_com_llm(uploaded_video)
+
+        # Exibe a lista de ações detectadas
+        st.subheader('Ações Detectadas:')
+        for action in action_report:
+            st.write(f"- {action}")
+
+    # Botão para remover o vídeo
+    if st.button("Remover Vídeo"):
+        st.session_state.video = None
+        st.experimental_rerun()  # Atualiza a aplicação
+
+    # Se um vídeo foi armazenado no estado da sessão, exibe a opção de remover
+    if st.session_state.video is not None:
+        st.info("Vídeo carregado. Clique no botão acima para removê-lo.")
+
+# Chamar a função para exibir a interface de upload e análise de vídeo
+alinhar_video()
