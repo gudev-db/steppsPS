@@ -2,14 +2,21 @@ import cv2
 import time
 import streamlit as st
 from ultralytics import YOLO
+import tempfile
+import shutil
 
 # Carregar o modelo treinado YOLO
 model = YOLO('classW.pt')  # Substitua pelo caminho correto para o seu modelo
 
 # Função para processar o vídeo e detectar ações
-def process_video(video_path):
-    # Abrir o vídeo
-    cap = cv2.VideoCapture(video_path)
+def process_video(video_file):
+    # Criar um arquivo temporário para o vídeo
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(video_file.read())
+        temp_file_path = temp_file.name
+    
+    # Abrir o vídeo usando o OpenCV
+    cap = cv2.VideoCapture(temp_file_path)
     frame_rate = cap.get(cv2.CAP_PROP_FPS)  # Taxa de quadros do vídeo
     duration = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) / frame_rate  # Duração total do vídeo
     
@@ -48,6 +55,9 @@ def process_video(video_path):
         action_durations.append(time.time() - start_time)
     
     cap.release()
+    
+    # Limpar o arquivo temporário
+    os.remove(temp_file_path)
     
     # Gerar o documento com as ações e durações
     action_report = {}
