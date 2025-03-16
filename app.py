@@ -52,7 +52,7 @@ def process_video(video_file):
                                 (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
         # Mostrar o frame no Streamlit
-        stframe.image(frame, channels="BGR", use_column_width=True)
+        stframe.image(frame, channels="BGR", use_container_width=True)
 
     cap.release()
 
