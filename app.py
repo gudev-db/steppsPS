@@ -1,127 +1,94 @@
 import streamlit as st
 import cv2
-import google.generativeai as genai
-from PIL import Image
-import io
+from ultralytics import YOLO
+from collections import defaultdict
 import tempfile
 import os
-import time
 
-# Configuração do Gemini API
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=gemini_api_key)
+def load_model(model_path):
+    model = YOLO(model_path)
+    return model
 
-# Inicializa os modelos do Gemini
-modelo_vision = genai.GenerativeModel(
-    "gemini-2.0-flash",
-    generation_config={
-        "temperature": 0.1  # Ajuste a temperatura aqui
-    }
-)  # Modelo para imagens
-modelo_texto = genai.GenerativeModel("gemini-1.5-flash")  # Modelo para texto
+def process_video(model, video_path):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        st.error("Erro ao abrir o vídeo. Verifique o formato do arquivo.")
+        return {}
 
-# Guias do cliente (feedbacks do cliente)
-guias = """[Guia de comentários do cliente]"""
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = 0
+    class_appearances = defaultdict(list)
 
-# Função para processar o vídeo e identificar ações com LLM
-def processar_video_com_llm(uploaded_video):
-    # Criar um arquivo temporário para o vídeo
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_file.write(uploaded_video.read())
-        temp_file_path = temp_file.name
+    video_placeholder = st.empty()
 
-    # Abrir o vídeo com OpenCV
-    cap = cv2.VideoCapture(temp_file_path)
-    
-    action_report = []  # Lista para armazenar as ações detectadas
-    
-    # Definir as ações possíveis
-    actions = ['ApplyEyeMakeup', 'ApplyLipstick', 'BlowDryHair', 'BrushingTeeth', 'Haircut']
-
-    # Iterar sobre os quadros do vídeo
-    while True:
+    while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
-        
-        # Processar o quadro: gerar uma descrição (por exemplo, a partir de características da imagem)
-        # Você pode integrar o modelo de detecção de objetos aqui ou gerar um resumo simples do quadro.
-        # Aqui vamos usar o modelo LLM para descrever o que acontece no quadro.
-        
-        # Convertemos o quadro para uma imagem que pode ser usada na LLM
-        pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        img_byte_arr = io.BytesIO()
-        pil_img.save(img_byte_arr, format="PNG")
-        img_bytes = img_byte_arr.getvalue()
-        
-        # Gerar uma descrição do quadro usando a LLM (modelo de visão)
-        prompt = f"Descreva detalhadamente o que está acontecendo nesta imagem. As ações possíveis são: {', '.join(actions)}. A imagem é uma sequência de um vídeo."
-        
-        try:
-            with st.spinner('Analisando o vídeo...'):
-                resposta = modelo_vision.generate_content(
-                    contents=[prompt, {"mime_type": "image/png", "data": img_bytes}]
-                )
-                descricao_imagem = resposta.text  # A descrição da imagem gerada pela LLM
 
-                # Usamos a LLM para determinar a ação com base na descrição
-                action_predicted = None
-                for action in actions:
-                    if action.lower() in descricao_imagem.lower():
-                        action_predicted = action
-                        break
+        results = model(frame)
+        annotated_frame = results[0].plot()
 
-                # Armazenar a ação detectada
-                if action_predicted:
-                    action_report.append(action_predicted)
-                else:
-                    action_report.append("Ação não detectada")
+        video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
 
-                # Exibe a descrição e a ação detectada
-                st.write(f"Descrição do quadro: {descricao_imagem}")
-                st.write(f"Ação detectada: {action_predicted}")
+        current_time = frame_count / fps
+        highest_confidence_detection = None
 
-                # Opcional: Atrasar um pouco para simular a taxa de quadros
-                time.sleep(1 / cap.get(cv2.CAP_PROP_FPS))
-        
-        except Exception as e:
-            st.error(f"Ocorreu um erro ao processar o quadro: {e}")
-            break
+        for result in results:
+            for box in result.boxes:
+                confidence = box.conf.item()
+                if highest_confidence_detection is None or confidence > highest_confidence_detection[1]:
+                    class_id = int(box.cls)
+                    class_name = model.names[class_id]
+                    highest_confidence_detection = (class_name, confidence)
+
+        if highest_confidence_detection:
+            class_name = highest_confidence_detection[0]
+            if not class_appearances[class_name] or class_appearances[class_name][-1][1] < current_time:
+                class_appearances[class_name].append([current_time, current_time + 1 / fps])
+            else:
+                class_appearances[class_name][-1][1] = current_time + 1 / fps
+
+        frame_count += 1
 
     cap.release()
-    os.remove(temp_file_path)
-    return action_report
 
-# Função para exibir o vídeo e processar
-def alinhar_video():
-    st.subheader('Aprovação de Criativos (Vídeo)')
+    class_durations = {}
+    for class_name, intervals in class_appearances.items():
+        total_duration = sum(end - start for start, end in intervals)
+        class_durations[class_name] = total_duration
 
-    # Criação de um estado para controlar o vídeo carregado
-    if 'video' not in st.session_state:
-        st.session_state.video = None
+    return class_durations
 
-    # Upload do vídeo
-    uploaded_video = st.file_uploader("Escolha um vídeo", type=["mp4", "avi"])
-    if uploaded_video is not None:
-        # Exibe o vídeo carregado
-        st.video(uploaded_video)
+def main():
+    st.title("Detecção de Classes em Vídeo com YOLOv11")
 
-        # Processa o vídeo e analisa as ações
-        action_report = processar_video_com_llm(uploaded_video)
+    model_path = "finalW.pt"  
+    if not os.path.exists(model_path):
+        st.error(f"Modelo não encontrado no caminho: {model_path}")
+        return
 
-        # Exibe a lista de ações detectadas
-        st.subheader('Ações Detectadas:')
-        for action in action_report:
-            st.write(f"- {action}")
+    model = load_model(model_path)
+    st.success("Modelo carregado com sucesso!")
 
-    # Botão para remover o vídeo
-    if st.button("Remover Vídeo"):
-        st.session_state.video = None
-        st.experimental_rerun()  # Atualiza a aplicação
+    video_file = st.file_uploader("Carregue um vídeo MP4", type=["mp4"])
+    if video_file is not None:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
+            tmp_video.write(video_file.getbuffer())
+            video_path = tmp_video.name
 
-    # Se um vídeo foi armazenado no estado da sessão, exibe a opção de remover
-    if st.session_state.video is not None:
-        st.info("Vídeo carregado. Clique no botão acima para removê-lo.")
+        st.video(video_path)
 
-# Chamar a função para exibir a interface de upload e análise de vídeo
-alinhar_video()
+        if st.button("Processar Vídeo"):
+            with st.spinner("Processando vídeo..."):
+                class_durations = process_video(model, video_path)
+                st.success("Processamento concluído!")
+
+                st.subheader("Duração Total de Cada Classe:")
+                for class_name, duration in class_durations.items():
+                    st.write(f"Classe {class_name}: {duration:.2f} segundos")
+
+            os.unlink(video_path)
+
+if __name__ == "__main__":
+    main()
