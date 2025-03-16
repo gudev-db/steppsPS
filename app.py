@@ -31,8 +31,8 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)  # Classificação do frame
 
-        # Verificar as probabilidades diretamente
-        if results.probs is not None:
+        # Verificar se results contém os dados de probabilidade
+        if hasattr(results, 'probs') and results.probs is not None:
             for class_id, prob in enumerate(results.probs[0]):  # results.probs[0] contém as probabilidades para o primeiro frame
                 class_name = results.names[class_id]
                 confidence = prob.item()  # Probabilidade da classe
