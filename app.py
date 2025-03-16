@@ -1,94 +1,84 @@
-import streamlit as st
 import cv2
+import time
+import streamlit as st
 from ultralytics import YOLO
-from collections import defaultdict
-import tempfile
-import os
 
-def load_model(model_path):
-    model = YOLO(model_path)
-    return model
+# Carregar o modelo treinado YOLO
+model = YOLO('classW.pt')  # Substitua pelo caminho correto para o seu modelo
 
-def process_video(model, video_path):
+# Função para processar o vídeo e detectar ações
+def process_video(video_path):
+    # Abrir o vídeo
     cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        st.error("Erro ao abrir o vídeo. Verifique o formato do arquivo.")
-        return {}
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = 0
-    class_appearances = defaultdict(list)
-
-    video_placeholder = st.empty()
-
-    while cap.isOpened():
+    frame_rate = cap.get(cv2.CAP_PROP_FPS)  # Taxa de quadros do vídeo
+    duration = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) / frame_rate  # Duração total do vídeo
+    
+    action_times = []  # Lista para armazenar os tempos das ações detectadas
+    action_durations = []  # Lista para armazenar as durações de cada ação
+    current_action = None
+    start_time = None
+    
+    while True:
         ret, frame = cap.read()
         if not ret:
             break
-
-        results = model(frame)
-        annotated_frame = results[0].plot()
-
-        video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
-
-        current_time = frame_count / fps
-        highest_confidence_detection = None
-
-        for result in results:
-            for box in result.boxes:
-                confidence = box.conf.item()
-                if highest_confidence_detection is None or confidence > highest_confidence_detection[1]:
-                    class_id = int(box.cls)
-                    class_name = model.names[class_id]
-                    highest_confidence_detection = (class_name, confidence)
-
-        if highest_confidence_detection:
-            class_name = highest_confidence_detection[0]
-            if not class_appearances[class_name] or class_appearances[class_name][-1][1] < current_time:
-                class_appearances[class_name].append([current_time, current_time + 1 / fps])
-            else:
-                class_appearances[class_name][-1][1] = current_time + 1 / fps
-
-        frame_count += 1
-
+        
+        # Detectar ações no quadro atual
+        results = model(frame)  # Detecção no frame
+        predictions = results.pandas().xywh[0]  # Extrair os resultados
+        
+        # Verificar se a ação foi detectada
+        if len(predictions) > 0:
+            detected_action = predictions.iloc[0]['name']
+            if detected_action != current_action:
+                if current_action is not None and start_time is not None:
+                    # Armazenar a ação anterior e sua duração
+                    action_times.append((current_action, start_time))
+                    action_durations.append(time.time() - start_time)
+                
+                # Atualizar a ação atual
+                current_action = detected_action
+                start_time = time.time()
+        
+        time.sleep(1 / frame_rate)  # Atraso para simular a taxa de quadros
+    
+    # Adicionar a última ação detectada
+    if current_action is not None and start_time is not None:
+        action_times.append((current_action, start_time))
+        action_durations.append(time.time() - start_time)
+    
     cap.release()
+    
+    # Gerar o documento com as ações e durações
+    action_report = {}
+    for action, start in zip(action_times, action_durations):
+        action_report[action[0]] = round(start, 2)
+    
+    return action_report, action_durations
 
-    class_durations = {}
-    for class_name, intervals in class_appearances.items():
-        total_duration = sum(end - start for start, end in intervals)
-        class_durations[class_name] = total_duration
+# Interface Streamlit
+st.title('Detecção de Ações Humanas em Vídeos')
 
-    return class_durations
+# Carregar o vídeo
+uploaded_video = st.file_uploader("Faça upload de um vídeo", type=["mp4", "mov", "avi"])
 
-def main():
-    st.title("Detecção de Classes em Vídeo com YOLOv11")
-
-    model_path = "finalW.pt"  
-    if not os.path.exists(model_path):
-        st.error(f"Modelo não encontrado no caminho: {model_path}")
-        return
-
-    model = load_model(model_path)
-    st.success("Modelo carregado com sucesso!")
-
-    video_file = st.file_uploader("Carregue um vídeo MP4", type=["mp4","avi"])
-    if video_file is not None:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
-            tmp_video.write(video_file.getbuffer())
-            video_path = tmp_video.name
-
-        st.video(video_path)
-
-        if st.button("Processar Vídeo"):
-            with st.spinner("Processando vídeo..."):
-                class_durations = process_video(model, video_path)
-                st.success("Processamento concluído!")
-
-                st.subheader("Duração Total de Cada Classe:")
-                for class_name, duration in class_durations.items():
-                    st.write(f"Classe {class_name}: {duration:.2f} segundos")
-
-            os.unlink(video_path)
-
-if __name__ == "__main__":
-    main()
+if uploaded_video is not None:
+    # Exibir o vídeo carregado
+    st.video(uploaded_video)
+    
+    # Processar o vídeo e obter as ações e durações
+    action_report, action_durations = process_video(uploaded_video)
+    
+    # Exibir as ações detectadas
+    st.write("Ações Detectadas:")
+    for action, duration in zip(action_report.keys(), action_durations):
+        st.write(f"{action}: {round(duration, 2)} segundos")
+    
+    # Gerar um arquivo de relatório
+    report_file = "action_report.txt"
+    with open(report_file, "w") as f:
+        for action, duration in zip(action_report.keys(), action_durations):
+            f.write(f"{action}: {round(duration, 2)} segundos\n")
+    
+    # Botão para download do relatório
+    st.download_button("Baixar Relatório", report_file)
