@@ -1,76 +1,94 @@
 import streamlit as st
 import cv2
-import numpy as np
 from ultralytics import YOLO
-import time
+from collections import defaultdict
 import tempfile
+import os
 
-# Carregar o modelo treinado
-model = YOLO("classW.pt")
+def load_model(model_path):
+    model = YOLO(model_path)
+    return model
 
-# Função para processar o vídeo e classificar cada frame
-def process_video(video_file):
-    # Salvar o vídeo temporariamente
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_file.write(video_file.read())
-        temp_file_path = temp_file.name
+def process_video(model, video_path):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        st.error("Erro ao abrir o vídeo. Verifique o formato do arquivo.")
+        return {}
 
-    # Abrir o vídeo
-    cap = cv2.VideoCapture(temp_file_path)
-    frame_rate = cap.get(cv2.CAP_PROP_FPS)  # Pega a taxa de quadros do vídeo
+    fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = 0
-    class_durations = {}
+    class_appearances = defaultdict(list)
 
-    # Iniciar a exibição do vídeo no Streamlit
-    stframe = st.empty()
+    video_placeholder = st.empty()
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
+
+        results = model(frame)
+        annotated_frame = results[0].plot()
+
+        video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
+
+        current_time = frame_count / fps
+        highest_confidence_detection = None
+
+        for result in results:
+            for box in result.boxes:
+                confidence = box.conf.item()
+                if highest_confidence_detection is None or confidence > highest_confidence_detection[1]:
+                    class_id = int(box.cls)
+                    class_name = model.names[class_id]
+                    highest_confidence_detection = (class_name, confidence)
+
+        if highest_confidence_detection:
+            class_name = highest_confidence_detection[0]
+            if not class_appearances[class_name] or class_appearances[class_name][-1][1] < current_time:
+                class_appearances[class_name].append([current_time, current_time + 1 / fps])
+            else:
+                class_appearances[class_name][-1][1] = current_time + 1 / fps
+
         frame_count += 1
 
-        # Realizar a classificação no frame
-        results = model(frame)
-        
-        # Verificar se há resultados de classificação
-        if hasattr(results, 'names') and results.names:
-            # Acessando as probabilidades de cada classe
-            if results.probs is not None:
-                class_probs = results.probs[0].cpu().numpy()  # Pegando as probabilidades da primeira imagem
-                max_prob_class_idx = np.argmax(class_probs)  # Pegando o índice da classe com maior probabilidade
-                class_name = results.names[max_prob_class_idx]  # Pegando o nome da classe
-
-                # Debug: Exibir a classe detectada
-                st.write(f"Classe detectada: {class_name}")
-                
-                # Exibir o nome da classe sobre o frame
-                cv2.putText(frame, f"{class_name}", (30, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-                
-                # Exibindo o frame no Streamlit
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                stframe.image(frame_rgb, channels="RGB", use_container_width=True)
-
-                # Atualizando o tempo de duração de cada classe
-                if class_name in class_durations:
-                    class_durations[class_name]['duration'] += 1 / frame_rate
-                else:
-                    class_durations[class_name] = {'duration': 1 / frame_rate}
-
-        time.sleep(1 / frame_rate)  # Atraso para simular o FPS original do vídeo
-
-    # Fechar o vídeo
     cap.release()
 
-    # Exibir os resultados ao final
-    st.write("Duração de cada classe (em segundos):")
-    for class_name, data in class_durations.items():
-        st.write(f"{class_name}: {data['duration']:.2f} segundos")
+    class_durations = {}
+    for class_name, intervals in class_appearances.items():
+        total_duration = sum(end - start for start, end in intervals)
+        class_durations[class_name] = total_duration
 
-# Interface do Streamlit
-st.title("Classificação de Ações no Vídeo")
-uploaded_file = st.file_uploader("Carregue um vídeo", type=["mp4", "avi", "mov"])
+    return class_durations
 
-if uploaded_file is not None:
-    process_video(uploaded_file)
+def main():
+    st.title("Detecção de Classes em Vídeo com YOLOv11")
+
+    model_path = "finalW.pt"  
+    if not os.path.exists(model_path):
+        st.error(f"Modelo não encontrado no caminho: {model_path}")
+        return
+
+    model = load_model(model_path)
+    st.success("Modelo carregado com sucesso!")
+
+    video_file = st.file_uploader("Carregue um vídeo MP4", type=["mp4"])
+    if video_file is not None:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
+            tmp_video.write(video_file.getbuffer())
+            video_path = tmp_video.name
+
+        st.video(video_path)
+
+        if st.button("Processar Vídeo"):
+            with st.spinner("Processando vídeo..."):
+                class_durations = process_video(model, video_path)
+                st.success("Processamento concluído!")
+
+                st.subheader("Duração Total de Cada Classe:")
+                for class_name, duration in class_durations.items():
+                    st.write(f"Classe {class_name}: {duration:.2f} segundos")
+
+            os.unlink(video_path)
+
+if __name__ == "__main__":
+    main()
