@@ -1,7 +1,9 @@
-![image](https://github.com/user-attachments/assets/62a9c8c5-78a3-4a44-8dd7-fb136a4b7252)O aplicativo está hospedado e rodando e pode ser acessado por aqui:
+![image](https://github.com/user-attachments/assets/62a9c8c5-78a3-4a44-8dd7-fb136a4b7252)
+
+
+## O aplicativo está hospedado e rodando e pode ser acessado por aqui:
 https://stepps-ps-gustavo-romao.streamlit.app/
 
-![Exemplo de uso](imagem.png)
 
 # Detecção de Classes em Vídeo com YOLOv11 e Streamlit
 Este aplicativo Streamlit permite que você faça upload de um vídeo MP4 e de um arquivo de modelo YOLOv11 (.pt). Ele processa o vídeo para detectar várias classes (objetos) usando o modelo YOLOv11, exibe os quadros anotados e calcula a duração total de cada classe detectada no vídeo.
