@@ -24,7 +24,14 @@ def process_video(video_file):
     action_durations = []  # Lista para armazenar as durações das ações
     current_action = None
     start_time = None
-    
+    action_durations_dict = {  # Dicionário para armazenar o tempo de cada ação
+        'ApplyEyeMakeup': 0,
+        'ApplyLipstick': 0,
+        'BlowDryHair': 0,
+        'BrushingTeeth': 0,
+        'Haircut': 0
+    }
+
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -33,15 +40,16 @@ def process_video(video_file):
         # Detectar a classe da ação no quadro atual
         results = model(frame)  # Detecção no frame (classificação)
         
-        # Extrair a classificação do resultado
-        predicted_class = results.names[results.pred[0].argmax()]  # Nome da classe predita
+        # Obter a classe com maior probabilidade
+        probs = results.probs[0]  # Probabilidades para o primeiro (e único) quadro
+        max_prob_index = probs.argmax()
+        predicted_class = results.names[max_prob_index]  # Nome da classe com maior probabilidade
         
         # Verificar se houve uma mudança na ação
         if predicted_class != current_action:
             if current_action is not None and start_time is not None:
-                # Armazenar a ação anterior e sua duração
-                action_times.append((current_action, start_time))
-                action_durations.append(time.time() - start_time)
+                # Armazenar a duração da ação anterior
+                action_durations_dict[current_action] += time.time() - start_time
             
             # Atualizar a ação atual
             current_action = predicted_class
@@ -51,8 +59,7 @@ def process_video(video_file):
     
     # Adicionar a última ação detectada
     if current_action is not None and start_time is not None:
-        action_times.append((current_action, start_time))
-        action_durations.append(time.time() - start_time)
+        action_durations_dict[current_action] += time.time() - start_time
     
     cap.release()
     
@@ -61,10 +68,11 @@ def process_video(video_file):
     
     # Gerar o relatório de ações e durações
     action_report = {}
-    for action, start in zip(action_times, action_durations):
-        action_report[action[0]] = round(start, 2)
+    for action, duration in action_durations_dict.items():
+        if duration > 0:  # Apenas incluir ações com durações positivas
+            action_report[action] = round(duration, 2)
     
-    return action_report, action_durations
+    return action_report, action_durations_dict
 
 # Interface Streamlit
 st.title('Detecção de Ações Humanas em Vídeos')
@@ -77,18 +85,18 @@ if uploaded_video is not None:
     st.video(uploaded_video)
     
     # Processar o vídeo e obter as ações e durações
-    action_report, action_durations = process_video(uploaded_video)
+    action_report, action_durations_dict = process_video(uploaded_video)
     
     # Exibir as ações detectadas
     st.write("Ações Detectadas:")
-    for action, duration in zip(action_report.keys(), action_durations):
-        st.write(f"{action}: {round(duration, 2)} segundos")
+    for action, duration in action_report.items():
+        st.write(f"{action}: {duration} segundos")
     
     # Gerar um arquivo de relatório
     report_file = "action_report.txt"
     with open(report_file, "w") as f:
-        for action, duration in zip(action_report.keys(), action_durations):
-            f.write(f"{action}: {round(duration, 2)} segundos\n")
+        for action, duration in action_report.items():
+            f.write(f"{action}: {duration} segundos\n")
     
     # Botão para download do relatório
     st.download_button("Baixar Relatório", report_file)
