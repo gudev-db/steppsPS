@@ -6,8 +6,8 @@ import tempfile
 import os
 
 def load_model(model_path):
-    # Load a classification model instead of detection
-    model = YOLO(model_path)  # This can be any classification model
+    # Carregar o modelo de classificação
+    model = YOLO(model_path)  # Substitua pelo caminho do seu modelo de classificação
     return model
 
 def process_video(model, video_path):
@@ -19,6 +19,8 @@ def process_video(model, video_path):
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = 0
     class_appearances = defaultdict(list)
+    previous_class = None
+    start_time = 0
 
     video_placeholder = st.empty()
 
@@ -27,30 +29,35 @@ def process_video(model, video_path):
         if not ret:
             break
 
-        # Classify the entire frame (not detecting objects)
-        results = model(frame)  # Assuming model returns the class prediction for the frame
-        predicted_class = results[0].names[results[0].pred[0].argmax().item()]  # Get the class name from the prediction
+        # Classificar o quadro inteiro
+        results = model(frame)
+        predicted_class = results[0].names[results[0].pred[0].argmax().item()]  # Obter o nome da classe prevista
 
-        # Annotate the frame with the predicted class
+        # Anotar o quadro com a classe prevista
         annotated_frame = frame.copy()
-        cv2.putText(annotated_frame, f"Class: {predicted_class}", (50, 50),
+        cv2.putText(annotated_frame, f"Classe: {predicted_class}", (50, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
         video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
 
         current_time = frame_count / fps
 
-        # Track the time interval for each predicted class
-        if not class_appearances[predicted_class] or class_appearances[predicted_class][-1][1] < current_time:
-            class_appearances[predicted_class].append([current_time, current_time + 1 / fps])
-        else:
-            class_appearances[predicted_class][-1][1] = current_time + 1 / fps
+        # Registrar a duração das sequências de quadros com a mesma classe
+        if predicted_class != previous_class:
+            if previous_class is not None:
+                class_appearances[previous_class].append([start_time, current_time])
+            start_time = current_time
+        previous_class = predicted_class
 
         frame_count += 1
 
+    # Adicionar a última sequência
+    if previous_class is not None:
+        class_appearances[previous_class].append([start_time, current_time])
+
     cap.release()
 
-    # Calculate the total duration for each class
+    # Calcular a duração total de cada classe
     class_durations = {}
     for class_name, intervals in class_appearances.items():
         total_duration = sum(end - start for start, end in intervals)
@@ -61,7 +68,7 @@ def process_video(model, video_path):
 def main():
     st.title("Classificação de Classes em Vídeo com YOLO")
 
-    model_path = "classW.pt"  
+    model_path = "classW.pt"  # Substitua pelo caminho do seu modelo de classificação
     if not os.path.exists(model_path):
         st.error(f"Modelo não encontrado no caminho: {model_path}")
         return
