@@ -61,7 +61,7 @@ def process_video(model, video_path):
 def main():
     st.title("Classificação de Classes em Vídeo com YOLO")
 
-    model_path = "augW.pt"  # Replace this with your classification model
+    model_path = "classW.pt"  
     if not os.path.exists(model_path):
         st.error(f"Modelo não encontrado no caminho: {model_path}")
         return
