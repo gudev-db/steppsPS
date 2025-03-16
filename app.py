@@ -34,8 +34,8 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)  # Classificação do frame
 
-        # Verificando se há resultados
-        if results.pandas().xywh[0].shape[0] > 0:  # Se houver resultados
+        # Verificando se há resultados de classificação
+        if results.pandas().xywh is not None and len(results.pandas().xywh) > 0:  # Se houver resultados
             class_probabilities = results.pandas().xywh[0]  # Pega as probabilidades em formato pandas
 
             # Iterando sobre as classes detectadas
