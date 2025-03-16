@@ -2,7 +2,6 @@
 Este aplicativo Streamlit permite que você faça upload de um vídeo MP4 e de um arquivo de modelo YOLOv11 (.pt). Ele processa o vídeo para detectar várias classes (objetos) usando o modelo YOLOv11, exibe os quadros anotados e calcula a duração total de cada classe detectada no vídeo.
 
 ## Funcionalidades:
-Faça o upload de um arquivo de modelo YOLOv11 (.pt).
 Faça o upload de um arquivo de vídeo MP4 para detecção de classes.
 Exiba os quadros anotados com caixas delimitadoras e rótulos de classe em tempo real.
 Calcule e exiba a duração total de cada classe detectada no vídeo.
