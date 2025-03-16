@@ -3,12 +3,12 @@ import time
 import streamlit as st
 from ultralytics import YOLO
 import tempfile
-import shutil
+import os
 
-# Carregar o modelo treinado YOLO
-model = YOLO('classW.pt')  # Substitua pelo caminho correto para o seu modelo
+# Carregar o modelo YOLO treinado
+model = YOLO('classW.pt')  # Substitua pelo caminho correto para o seu modelo treinado
 
-# Função para processar o vídeo e detectar ações
+# Função para processar o vídeo e detectar as ações
 def process_video(video_file):
     # Criar um arquivo temporário para o vídeo
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -20,8 +20,8 @@ def process_video(video_file):
     frame_rate = cap.get(cv2.CAP_PROP_FPS)  # Taxa de quadros do vídeo
     duration = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) / frame_rate  # Duração total do vídeo
     
-    action_times = []  # Lista para armazenar os tempos das ações detectadas
-    action_durations = []  # Lista para armazenar as durações de cada ação
+    action_times = []  # Lista para armazenar as ações detectadas e seus tempos
+    action_durations = []  # Lista para armazenar as durações das ações
     current_action = None
     start_time = None
     
@@ -30,22 +30,22 @@ def process_video(video_file):
         if not ret:
             break
         
-        # Detectar ações no quadro atual
-        results = model(frame)  # Detecção no frame
-        predictions = results.pandas().xywh[0]  # Extrair os resultados
+        # Detectar a classe da ação no quadro atual
+        results = model(frame)  # Detecção no frame (classificação)
         
-        # Verificar se a ação foi detectada
-        if len(predictions) > 0:
-            detected_action = predictions.iloc[0]['name']
-            if detected_action != current_action:
-                if current_action is not None and start_time is not None:
-                    # Armazenar a ação anterior e sua duração
-                    action_times.append((current_action, start_time))
-                    action_durations.append(time.time() - start_time)
-                
-                # Atualizar a ação atual
-                current_action = detected_action
-                start_time = time.time()
+        # Extrair a classificação do resultado
+        predicted_class = results.names[results.pred[0].argmax()]  # Nome da classe predita
+        
+        # Verificar se houve uma mudança na ação
+        if predicted_class != current_action:
+            if current_action is not None and start_time is not None:
+                # Armazenar a ação anterior e sua duração
+                action_times.append((current_action, start_time))
+                action_durations.append(time.time() - start_time)
+            
+            # Atualizar a ação atual
+            current_action = predicted_class
+            start_time = time.time()  # Iniciar o tempo da nova ação
         
         time.sleep(1 / frame_rate)  # Atraso para simular a taxa de quadros
     
@@ -59,7 +59,7 @@ def process_video(video_file):
     # Limpar o arquivo temporário
     os.remove(temp_file_path)
     
-    # Gerar o documento com as ações e durações
+    # Gerar o relatório de ações e durações
     action_report = {}
     for action, start in zip(action_times, action_durations):
         action_report[action[0]] = round(start, 2)
