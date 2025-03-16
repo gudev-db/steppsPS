@@ -33,6 +33,9 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)
         
+        # Debug: Mostrar o retorno do modelo
+        st.write(f"Resultados: {results}")
+        
         # Verificar se há resultados de classificação
         if hasattr(results, 'names') and results.names:
             # Obtém a classe com maior probabilidade
