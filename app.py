@@ -5,7 +5,7 @@ from ultralytics import YOLO
 import time
 
 # Carregar o modelo treinado
-model = YOLO('caminho/para/seu_modelo.pt')
+model = YOLO('classW.pt')
 
 # Função para processar o vídeo e classificar cada frame
 def process_video(video_file):
