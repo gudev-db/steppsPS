@@ -31,31 +31,18 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)  # Classificação do frame
 
-        # Verificar se há boxes e se foram detectadas classes
-        if results.boxes is not None and len(results.boxes.cls) > 0:
-            # Iterar sobre todas as boxes e pegar a classe com maior confiança
-            for i in range(len(results.boxes.cls)):
-                class_id = int(results.boxes.cls[i])
-                confidence = results.boxes.conf[i].item()
-                class_name = results.names[class_id]
-
-                # Atualizar a duração da classe detectada
-                timestamp = frame_count / frame_rate  # Calcular o timestamp baseado no número de quadros
-                if class_name not in class_durations:
-                    class_durations[class_name] = {'start': timestamp, 'duration': 0}
-                else:
-                    class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementar a duração da classe
-        else:
-            # Caso não haja boxes detectadas, verificar as probabilidades diretamente
-            for class_id, prob in enumerate(results.probs):  # Acessando probabilidades de cada classe
+        # Verificar as probabilidades diretamente
+        if results.probs is not None:
+            for class_id, prob in enumerate(results.probs[0]):  # results.probs[0] contém as probabilidades para o primeiro frame
                 class_name = results.names[class_id]
                 confidence = prob.item()  # Probabilidade da classe
 
-                # Atualizar a duração da classe detectada
-                timestamp = frame_count / frame_rate  # Calcular o timestamp baseado no número de quadros
-                if class_name not in class_durations:
-                    class_durations[class_name] = {'start': timestamp, 'duration': 0}
-                class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementar a duração da classe
+                # Definir um limiar de confiança para considerar a classe como detectada
+                if confidence > 0.1:  # Limite de 10%, você pode ajustar conforme necessário
+                    timestamp = frame_count / frame_rate  # Calcular o timestamp baseado no número de quadros
+                    if class_name not in class_durations:
+                        class_durations[class_name] = {'start': timestamp, 'duration': 0}
+                    class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementar a duração da classe
 
     cap.release()
 
