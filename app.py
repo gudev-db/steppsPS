@@ -32,8 +32,12 @@ def process_video(model, video_path):
         results = model(frame)  # Inferência no quadro
 
         if results:
-            predicted_class = results[0].names[int(results[0].argmax())]  # Classe predita
-            confidence_score = results[0].conf[int(results[0].argmax())]  # Confiança
+            # A estrutura de resultados pode variar, então vamos imprimir para entender
+            print(results)
+
+            # Para classificação, verificamos o índice da classe com maior confiança
+            predicted_class = results[0].names[int(results[0].cls[0].item())]  # Classe predita
+            confidence_score = results[0].conf[0].item()  # Confiança da classe
 
             # Anotando o quadro com a classe predita
             annotated_frame = frame.copy()
