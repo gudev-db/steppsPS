@@ -34,10 +34,11 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)  # Classificação do frame
 
-        # Acessando os resultados de classificação
-        if results.pandas().xywh[0].shape[0] > 0:  # Verificando se há resultados
+        # Verificando se há resultados
+        if results.pandas().xywh[0].shape[0] > 0:  # Se houver resultados
             class_probabilities = results.pandas().xywh[0]  # Pega as probabilidades em formato pandas
 
+            # Iterando sobre as classes detectadas
             for _, row in class_probabilities.iterrows():
                 class_name = row['name']  # Nome da classe
                 confidence = row['confidence']  # Confiança da classe
