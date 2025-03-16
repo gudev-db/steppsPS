@@ -41,7 +41,7 @@ def process_video(video_file):
             class_name = results.names[max_prob_class_idx]  # Pegando o nome da classe
             class_prob = class_probs[max_prob_class_idx]  # Pegando a probabilidade da classe
 
-            # Exibir o vídeo com a classificação
+            # Exibir o nome da classe e a probabilidade sobre o frame
             cv2.putText(frame, f"{class_name} ({class_prob:.2f})", (30, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
             
