@@ -41,6 +41,9 @@ def process_video(video_file):
                 max_prob_class_idx = np.argmax(class_probs)  # Pegando o índice da classe com maior probabilidade
                 class_name = results.names[max_prob_class_idx]  # Pegando o nome da classe
 
+                # Debug: Exibir a classe detectada
+                st.write(f"Classe detectada: {class_name}")
+                
                 # Exibir o nome da classe sobre o frame
                 cv2.putText(frame, f"{class_name}", (30, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
