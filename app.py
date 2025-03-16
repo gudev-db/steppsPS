@@ -6,16 +6,10 @@ import tempfile
 import os
 
 def load_model(model_path):
-    """
-    Load the custom YOLO classification model from the given path.
-    """
-    model = YOLO(model_path)  # Load your custom model
+    model = YOLO(model_path)  # Carregar o modelo
     return model
 
 def process_video(model, video_path):
-    """
-    Process the video and track the duration of each class detected.
-    """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         st.error("Erro ao abrir o vídeo. Verifique o formato do arquivo.")
@@ -34,24 +28,24 @@ def process_video(model, video_path):
         if not ret:
             break
 
-        # Classify the frame
-        results = model(frame)  # Model inference on the current frame
+        # Classificar o quadro atual
+        results = model(frame)  # Inferência no quadro
 
         if results:
-            # Get the predicted class for the entire image (since it's a classification model)
-            predicted_class = results[0].names[int(results[0].cls[0].item())]
+            predicted_class = results[0].names[int(results[0].argmax())]  # Classe predita
+            confidence_score = results[0].conf[int(results[0].argmax())]  # Confiança
 
-            # Annotate the frame with the predicted class
+            # Anotando o quadro com a classe predita
             annotated_frame = frame.copy()
-            cv2.putText(annotated_frame, f"Classe: {predicted_class}", (50, 50),
+            cv2.putText(annotated_frame, f"Classe: {predicted_class} ({confidence_score:.2f})", (50, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
-            # Update the Streamlit video placeholder with the annotated frame
+            # Atualizando o vídeo no Streamlit
             video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
 
             current_time = frame_count / fps
 
-            # Track the duration of consecutive frames with the same class
+            # Atualizando a duração da classe detectada
             if predicted_class != previous_class:
                 if previous_class is not None:
                     class_appearances[previous_class].append([start_time, current_time])
@@ -60,13 +54,13 @@ def process_video(model, video_path):
 
         frame_count += 1
 
-    # Add the last segment of video class tracking
+    # Finalizando a última duração
     if previous_class is not None:
         class_appearances[previous_class].append([start_time, current_time])
 
     cap.release()
 
-    # Calculate the total duration for each class
+    # Calculando a duração total para cada classe
     class_durations = {}
     for class_name, intervals in class_appearances.items():
         total_duration = sum(end - start for start, end in intervals)
@@ -75,28 +69,20 @@ def process_video(model, video_path):
     return class_durations
 
 def main():
-    """
-    Main function to run the Streamlit app for video classification.
-    """
     st.title("Classificação de Classes em Vídeo com YOLO")
 
-    # Define the path to your custom model
-    model_path = "classW.pt"  # Replace with the path to your custom classification model
-    if not os.path.exists(model_path):
-        st.error(f"Modelo não encontrado no caminho: {model_path}")
-        return
-
+    # Caminho do modelo
+    model_path = "classW.pt"  # Modelo de classificação YOLOv8
     model = load_model(model_path)
     st.success("Modelo carregado com sucesso!")
 
-    # Upload video
     video_file = st.file_uploader("Carregue um vídeo MP4", type=["mp4"])
     if video_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
             tmp_video.write(video_file.getbuffer())
             video_path = tmp_video.name
 
-        # Display the video
+        # Exibindo o vídeo
         st.video(video_path)
 
         if st.button("Processar Vídeo"):
@@ -104,12 +90,12 @@ def main():
                 class_durations = process_video(model, video_path)
                 st.success("Processamento concluído!")
 
-                # Display the class durations
+                # Exibindo as durações de cada classe
                 st.subheader("Duração Total de Cada Classe:")
                 for class_name, duration in class_durations.items():
                     st.write(f"Classe {class_name}: {duration:.2f} segundos")
 
-            os.unlink(video_path)  # Remove the temporary video file after processing
+            os.unlink(video_path)
 
 if __name__ == "__main__":
     main()
