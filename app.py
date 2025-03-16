@@ -33,14 +33,14 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)
         
-        # Extrair os resultados de classificação
-        if results.names:
+        # Verificar se há resultados de classificação
+        if hasattr(results, 'names') and results.names:
             # Obtém a classe com maior probabilidade
-            class_probs = results.probs[0].cpu().numpy()
-            max_prob_class_idx = np.argmax(class_probs)
-            class_name = results.names[max_prob_class_idx]
-            class_prob = class_probs[max_prob_class_idx]
-            
+            class_probs = results.probs[0].cpu().numpy()  # Pegando as probabilidades da primeira imagem
+            max_prob_class_idx = np.argmax(class_probs)  # Pegando o índice da classe com maior probabilidade
+            class_name = results.names[max_prob_class_idx]  # Pegando o nome da classe
+            class_prob = class_probs[max_prob_class_idx]  # Pegando a probabilidade da classe
+
             # Exibir o vídeo com a classificação
             cv2.putText(frame, f"{class_name} ({class_prob:.2f})", (30, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
