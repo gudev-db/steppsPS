@@ -38,9 +38,9 @@ def process_video(model, video_path):
         results = model(frame)  # Model inference on the current frame
 
         if results:
-            # Get the predicted class for the first box (if exists)
-            predicted_class = results[0].names[int(results[0].boxes.cls[0].item())]
-            
+            # Get the predicted class for the entire image (since it's a classification model)
+            predicted_class = results[0].names[int(results[0].cls[0].item())]
+
             # Annotate the frame with the predicted class
             annotated_frame = frame.copy()
             cv2.putText(annotated_frame, f"Classe: {predicted_class}", (50, 50),
@@ -96,6 +96,7 @@ def main():
             tmp_video.write(video_file.getbuffer())
             video_path = tmp_video.name
 
+        # Display the video
         st.video(video_path)
 
         if st.button("Processar Vídeo"):
