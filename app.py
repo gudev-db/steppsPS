@@ -38,25 +38,26 @@ def process_video(video_file):
         
         # Verificar se há resultados de classificação
         if hasattr(results, 'names') and results.names:
-            # Obtém a classe com maior probabilidade
-            class_probs = results.probs[0].cpu().numpy()  # Pegando as probabilidades da primeira imagem
-            max_prob_class_idx = np.argmax(class_probs)  # Pegando o índice da classe com maior probabilidade
-            class_name = results.names[max_prob_class_idx]  # Pegando o nome da classe
-            class_prob = class_probs[max_prob_class_idx]  # Pegando a probabilidade da classe
+            # Acessando as probabilidades de cada classe
+            if results.probs is not None:
+                class_probs = results.probs[0].cpu().numpy()  # Pegando as probabilidades da primeira imagem
+                max_prob_class_idx = np.argmax(class_probs)  # Pegando o índice da classe com maior probabilidade
+                class_name = results.names[max_prob_class_idx]  # Pegando o nome da classe
+                class_prob = class_probs[max_prob_class_idx]  # Pegando a probabilidade da classe
 
-            # Exibir o nome da classe e a probabilidade sobre o frame
-            cv2.putText(frame, f"{class_name} ({class_prob:.2f})", (30, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-            
-            # Exibindo o frame no Streamlit
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            stframe.image(frame_rgb, channels="RGB", use_container_width=True)
+                # Exibir o nome da classe e a probabilidade sobre o frame
+                cv2.putText(frame, f"{class_name} ({class_prob:.2f})", (30, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                
+                # Exibindo o frame no Streamlit
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                stframe.image(frame_rgb, channels="RGB", use_container_width=True)
 
-            # Atualizando o tempo de duração de cada classe
-            if class_name in class_durations:
-                class_durations[class_name]['duration'] += 1 / frame_rate
-            else:
-                class_durations[class_name] = {'duration': 1 / frame_rate, 'prob': class_prob}
+                # Atualizando o tempo de duração de cada classe
+                if class_name in class_durations:
+                    class_durations[class_name]['duration'] += 1 / frame_rate
+                else:
+                    class_durations[class_name] = {'duration': 1 / frame_rate, 'prob': class_prob}
 
         time.sleep(1 / frame_rate)  # Atraso para simular o FPS original do vídeo
 
