@@ -33,25 +33,31 @@ def process_video(video_file):
         # Detectar a classe da ação no quadro atual
         results = model(frame)  # Detecção no frame (classificação)
         
-        # Extrair as probabilidades de todas as classes
-        probs = results.probs[0]  # Probabilidades para o primeiro (e único) quadro
+        # Imprimir a estrutura do retorno para depuração
+        print("Estrutura de results:", results)  # Imprimir o retorno para ver como está
         
-        # Obter a classe com maior probabilidade
-        predicted_class_idx = probs.argmax()  # Índice da classe com maior probabilidade
-        predicted_class = results.names[predicted_class_idx]  # Nome da classe predita
-        confidence = probs[predicted_class_idx]  # Confiança da predição
-        
-        # Verificar se houve uma mudança na ação
-        if predicted_class != current_action:
-            if current_action is not None and start_time is not None:
-                # Armazenar a ação anterior e sua duração
-                action_times.append((current_action, start_time))
-                action_durations.append(time.time() - start_time)
+        # Verificar se há resultados e obter as probabilidades
+        if hasattr(results, 'probs') and len(results.probs) > 0:
+            probs = results.probs[0]  # Probabilidades para o primeiro (e único) quadro
             
-            # Atualizar a ação atual
-            current_action = predicted_class
-            start_time = time.time()  # Iniciar o tempo da nova ação
-        
+            # Obter a classe com maior probabilidade
+            predicted_class_idx = probs.argmax()  # Índice da classe com maior probabilidade
+            predicted_class = results.names[predicted_class_idx]  # Nome da classe predita
+            confidence = probs[predicted_class_idx]  # Confiança da predição
+            
+            # Verificar se houve uma mudança na ação
+            if predicted_class != current_action:
+                if current_action is not None and start_time is not None:
+                    # Armazenar a ação anterior e sua duração
+                    action_times.append((current_action, start_time))
+                    action_durations.append(time.time() - start_time)
+                
+                # Atualizar a ação atual
+                current_action = predicted_class
+                start_time = time.time()  # Iniciar o tempo da nova ação
+        else:
+            print("Nenhuma probabilidade detectada no quadro")  # Caso não haja probabilidades
+
         time.sleep(1 / frame_rate)  # Atraso para simular a taxa de quadros
     
     # Adicionar a última ação detectada
