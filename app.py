@@ -18,7 +18,7 @@ def process_video(video_file):
 
     # Abrir o vídeo
     cap = cv2.VideoCapture(temp_file_path)
-    frame_rate = cap.get(cv2.CAP_PROP_FPS)
+    frame_rate = cap.get(cv2.CAP_PROP_FPS)  # Pega a taxa de quadros do vídeo
     frame_count = 0
     class_durations = {}
 
@@ -29,17 +29,33 @@ def process_video(video_file):
         frame_count += 1
 
         # Realizar a classificação no frame
-        results = model(frame)
+        results = model(frame)  # Classificação do frame
 
-        # Obter a classe com maior confiança
-        if results.names:
-            top_class = results.names[int(results.boxes.cls[0])]
-            confidence = results.boxes.conf[0].item()
-            timestamp = frame_count / frame_rate
-            if top_class not in class_durations:
-                class_durations[top_class] = {'start': timestamp, 'duration': 0}
-            else:
-                class_durations[top_class]['duration'] += 1 / frame_rate
+        # Verificar se há boxes e se foram detectadas classes
+        if results.boxes is not None and len(results.boxes.cls) > 0:
+            # Iterar sobre todas as boxes e pegar a classe com maior confiança
+            for i in range(len(results.boxes.cls)):
+                class_id = int(results.boxes.cls[i])
+                confidence = results.boxes.conf[i].item()
+                class_name = results.names[class_id]
+
+                # Atualizar a duração da classe detectada
+                timestamp = frame_count / frame_rate  # Calcular o timestamp baseado no número de quadros
+                if class_name not in class_durations:
+                    class_durations[class_name] = {'start': timestamp, 'duration': 0}
+                else:
+                    class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementar a duração da classe
+        else:
+            # Caso não haja boxes detectadas, verificar as probabilidades diretamente
+            for class_id, prob in enumerate(results.probs):  # Acessando probabilidades de cada classe
+                class_name = results.names[class_id]
+                confidence = prob.item()  # Probabilidade da classe
+
+                # Atualizar a duração da classe detectada
+                timestamp = frame_count / frame_rate  # Calcular o timestamp baseado no número de quadros
+                if class_name not in class_durations:
+                    class_durations[class_name] = {'start': timestamp, 'duration': 0}
+                class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementar a duração da classe
 
     cap.release()
 
@@ -60,5 +76,7 @@ if uploaded_file is not None:
     elapsed_time = time.time() - start_time
     st.write(f"Processamento concluído em {elapsed_time:.2f} segundos.")
     st.write("Duração de cada classe detectada (em segundos):")
+    
+    # Exibir as durações das classes detectadas
     for class_name, times in durations.items():
         st.write(f"{class_name}: {times['duration']:.2f} segundos")
