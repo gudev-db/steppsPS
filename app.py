@@ -22,6 +22,9 @@ def process_video(video_file):
     frame_count = 0
     class_durations = {}
 
+    # Iniciar a exibição do vídeo no Streamlit
+    stframe = st.empty()
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -43,6 +46,13 @@ def process_video(video_file):
                     if class_name not in class_durations:
                         class_durations[class_name] = {'start': timestamp, 'duration': 0}
                     class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementar a duração da classe
+
+                    # Adicionar o nome da classe no frame
+                    cv2.putText(frame, f"{class_name}: {confidence*100:.2f}%", 
+                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+        # Mostrar o frame no Streamlit
+        stframe.image(frame, channels="BGR", use_column_width=True)
 
     cap.release()
 
