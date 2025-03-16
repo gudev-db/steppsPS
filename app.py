@@ -35,7 +35,7 @@ def process_video(video_file):
         results = model(frame)  # Classificação do frame
 
         # Acessando os resultados de classificação
-        if results.names:  # Verificando se o modelo tem classes
+        if results.pandas().xywh[0].shape[0] > 0:  # Verificando se há resultados
             class_probabilities = results.pandas().xywh[0]  # Pega as probabilidades em formato pandas
 
             for _, row in class_probabilities.iterrows():
