@@ -63,7 +63,7 @@ def process_video(model, video_path):
 def main():
     st.title("Detecção de Classes em Vídeo com YOLOv11")
 
-    model_path = "test2.pt"  
+    model_path = "test3.pt"  
     if not os.path.exists(model_path):
         st.error(f"Modelo não encontrado no caminho: {model_path}")
         return
