@@ -6,7 +6,8 @@ import tempfile
 import os
 
 def load_model(model_path):
-    model = YOLO(model_path)
+    # Load a classification model instead of detection
+    model = YOLO(model_path)  # This can be any classification model
     return model
 
 def process_video(model, video_path):
@@ -26,33 +27,30 @@ def process_video(model, video_path):
         if not ret:
             break
 
-        results = model(frame)
-        annotated_frame = results[0].plot()
+        # Classify the entire frame (not detecting objects)
+        results = model(frame)  # Assuming model returns the class prediction for the frame
+        predicted_class = results[0].names[results[0].pred[0].argmax().item()]  # Get the class name from the prediction
+
+        # Annotate the frame with the predicted class
+        annotated_frame = frame.copy()
+        cv2.putText(annotated_frame, f"Class: {predicted_class}", (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
         video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
 
         current_time = frame_count / fps
-        highest_confidence_detection = None
 
-        for result in results:
-            for box in result.boxes:
-                confidence = box.conf.item()
-                if highest_confidence_detection is None or confidence > highest_confidence_detection[1]:
-                    class_id = int(box.cls)
-                    class_name = model.names[class_id]
-                    highest_confidence_detection = (class_name, confidence)
-
-        if highest_confidence_detection:
-            class_name = highest_confidence_detection[0]
-            if not class_appearances[class_name] or class_appearances[class_name][-1][1] < current_time:
-                class_appearances[class_name].append([current_time, current_time + 1 / fps])
-            else:
-                class_appearances[class_name][-1][1] = current_time + 1 / fps
+        # Track the time interval for each predicted class
+        if not class_appearances[predicted_class] or class_appearances[predicted_class][-1][1] < current_time:
+            class_appearances[predicted_class].append([current_time, current_time + 1 / fps])
+        else:
+            class_appearances[predicted_class][-1][1] = current_time + 1 / fps
 
         frame_count += 1
 
     cap.release()
 
+    # Calculate the total duration for each class
     class_durations = {}
     for class_name, intervals in class_appearances.items():
         total_duration = sum(end - start for start, end in intervals)
@@ -61,9 +59,9 @@ def process_video(model, video_path):
     return class_durations
 
 def main():
-    st.title("Detecção de Classes em Vídeo com YOLOv11")
+    st.title("Classificação de Classes em Vídeo com YOLO")
 
-    model_path = "augW.pt"  
+    model_path = "augW.pt"  # Replace this with your classification model
     if not os.path.exists(model_path):
         st.error(f"Modelo não encontrado no caminho: {model_path}")
         return
