@@ -4,7 +4,6 @@ import numpy as np
 from ultralytics import YOLO
 import time
 import tempfile
-import os
 
 # Carregar o modelo treinado
 model = YOLO("classW.pt")
@@ -32,43 +31,43 @@ def process_video(video_file):
         frame_count += 1
 
         # Realizar a classificação no frame
-        results = model(frame)  # Classificação do frame
+        results = model(frame)
+        
+        # Extrair os resultados de classificação
+        if results.names:
+            # Obtém a classe com maior probabilidade
+            class_probs = results.probs[0].cpu().numpy()
+            max_prob_class_idx = np.argmax(class_probs)
+            class_name = results.names[max_prob_class_idx]
+            class_prob = class_probs[max_prob_class_idx]
+            
+            # Exibir o vídeo com a classificação
+            cv2.putText(frame, f"{class_name} ({class_prob:.2f})", (30, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            
+            # Exibindo o frame no Streamlit
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            stframe.image(frame_rgb, channels="RGB", use_container_width=True)
 
-        # Verificando se há resultados de classificação
-        if results.pandas().xywh is not None and len(results.pandas().xywh) > 0:  # Se houver resultados
-            class_probabilities = results.pandas().xywh[0]  # Pega as probabilidades em formato pandas
+            # Atualizando o tempo de duração de cada classe
+            if class_name in class_durations:
+                class_durations[class_name]['duration'] += 1 / frame_rate
+            else:
+                class_durations[class_name] = {'duration': 1 / frame_rate, 'prob': class_prob}
 
-            # Iterando sobre as classes detectadas
-            for _, row in class_probabilities.iterrows():
-                class_name = row['name']  # Nome da classe
-                confidence = row['confidence']  # Confiança da classe
+        time.sleep(1 / frame_rate)  # Atraso para simular o FPS original do vídeo
 
-                if confidence > 0.1:  # Ignora classes com baixa confiança
-                    timestamp = frame_count / frame_rate  # Calcula o timestamp baseado no número de quadros
-
-                    # Armazenar a duração de cada classe
-                    if class_name not in class_durations:
-                        class_durations[class_name] = {'start': timestamp, 'duration': 0}
-                    class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementa a duração
-
-                    # Adicionar o nome da classe no frame
-                    cv2.putText(frame, f"{class_name}: {confidence*100:.2f}%", 
-                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
-        # Exibir o frame no Streamlit
-        stframe.image(frame, channels="BGR", use_column_width=True)
-
+    # Fechar o vídeo
     cap.release()
-    os.remove(temp_file_path)
 
-    # Exibir a duração de cada classe após o processamento
-    st.write("Duração de cada classe detectada:")
+    # Exibir os resultados ao final
+    st.write("Duração de cada classe (em segundos):")
     for class_name, data in class_durations.items():
-        st.write(f"{class_name}: {data['duration']:.2f} segundos")
+        st.write(f"{class_name}: {data['duration']:.2f} segundos, Probabilidade média: {data['prob']:.2f}")
 
-# Interface no Streamlit
-st.title("Classificação de Ações em Vídeos")
-uploaded_file = st.file_uploader("Escolha um vídeo", type=["mp4", "mov", "avi"])
+# Interface do Streamlit
+st.title("Classificação de Ações no Vídeo")
+uploaded_file = st.file_uploader("Carregue um vídeo", type=["mp4", "avi", "mov"])
 
 if uploaded_file is not None:
     durations = process_video(uploaded_file)
