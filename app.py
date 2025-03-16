@@ -33,9 +33,6 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)
         
-        # Debug: Mostrar o retorno do modelo
-        st.write(f"Resultados: {results}")
-        
         # Verificar se há resultados de classificação
         if hasattr(results, 'names') and results.names:
             # Acessando as probabilidades de cada classe
@@ -43,10 +40,9 @@ def process_video(video_file):
                 class_probs = results.probs[0].cpu().numpy()  # Pegando as probabilidades da primeira imagem
                 max_prob_class_idx = np.argmax(class_probs)  # Pegando o índice da classe com maior probabilidade
                 class_name = results.names[max_prob_class_idx]  # Pegando o nome da classe
-                class_prob = class_probs[max_prob_class_idx]  # Pegando a probabilidade da classe
 
-                # Exibir o nome da classe e a probabilidade sobre o frame
-                cv2.putText(frame, f"{class_name} ({class_prob:.2f})", (30, 30),
+                # Exibir o nome da classe sobre o frame
+                cv2.putText(frame, f"{class_name}", (30, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                 
                 # Exibindo o frame no Streamlit
@@ -57,7 +53,7 @@ def process_video(video_file):
                 if class_name in class_durations:
                     class_durations[class_name]['duration'] += 1 / frame_rate
                 else:
-                    class_durations[class_name] = {'duration': 1 / frame_rate, 'prob': class_prob}
+                    class_durations[class_name] = {'duration': 1 / frame_rate}
 
         time.sleep(1 / frame_rate)  # Atraso para simular o FPS original do vídeo
 
@@ -67,11 +63,11 @@ def process_video(video_file):
     # Exibir os resultados ao final
     st.write("Duração de cada classe (em segundos):")
     for class_name, data in class_durations.items():
-        st.write(f"{class_name}: {data['duration']:.2f} segundos, Probabilidade média: {data['prob']:.2f}")
+        st.write(f"{class_name}: {data['duration']:.2f} segundos")
 
 # Interface do Streamlit
 st.title("Classificação de Ações no Vídeo")
 uploaded_file = st.file_uploader("Carregue um vídeo", type=["mp4", "avi", "mov"])
 
 if uploaded_file is not None:
-    durations = process_video(uploaded_file)
+    process_video(uploaded_file)
