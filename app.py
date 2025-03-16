@@ -6,7 +6,7 @@ import tempfile
 import os
 
 def load_model(model_path):
-    # Carregar o modelo de classificação
+    # Carregar o modelo de classificação YOLO (certifique-se de que seja um modelo de classificação)
     model = YOLO(model_path)  # Substitua pelo caminho do seu modelo de classificação
     return model
 
@@ -29,25 +29,29 @@ def process_video(model, video_path):
         if not ret:
             break
 
-        # Classificar o quadro inteiro
+        # Classificar o quadro inteiro com o modelo YOLO
         results = model(frame)
-        predicted_class = results[0].names[results[0].pred[0].argmax().item()]  # Obter o nome da classe prevista
+        
+        # Verifique se há alguma detecção e pegue a classe com maior probabilidade
+        if results and results[0].pred[0].shape[0] > 0:
+            # Obtendo a classe com maior probabilidade do quadro (modelo de classificação)
+            predicted_class = results[0].names[int(results[0].pred[0][0].item())]  # Classe com maior probabilidade
+            
+            # Anotar o quadro com a classe prevista
+            annotated_frame = frame.copy()
+            cv2.putText(annotated_frame, f"Classe: {predicted_class}", (50, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
-        # Anotar o quadro com a classe prevista
-        annotated_frame = frame.copy()
-        cv2.putText(annotated_frame, f"Classe: {predicted_class}", (50, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
 
-        video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
+            current_time = frame_count / fps
 
-        current_time = frame_count / fps
-
-        # Registrar a duração das sequências de quadros com a mesma classe
-        if predicted_class != previous_class:
-            if previous_class is not None:
-                class_appearances[previous_class].append([start_time, current_time])
-            start_time = current_time
-        previous_class = predicted_class
+            # Registrar a duração das sequências de quadros com a mesma classe
+            if predicted_class != previous_class:
+                if previous_class is not None:
+                    class_appearances[previous_class].append([start_time, current_time])
+                start_time = current_time
+            previous_class = predicted_class
 
         frame_count += 1
 
