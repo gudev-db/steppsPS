@@ -71,7 +71,7 @@ def main():
     model = load_model(model_path)
     st.success("Modelo carregado com sucesso!")
 
-    video_file = st.file_uploader("Carregue um vídeo MP4", type=["mp4"])
+    video_file = st.file_uploader("Carregue um vídeo MP4", type=["mp4","avi"])
     if video_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
             tmp_video.write(video_file.getbuffer())
