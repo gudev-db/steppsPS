@@ -34,46 +34,40 @@ def process_video(video_file):
         # Realizar a classificação no frame
         results = model(frame)  # Classificação do frame
 
-        # Verificar se results contém os dados de probabilidade
-        if hasattr(results, 'probs') and results.probs is not None:
-            for class_id, prob in enumerate(results.probs[0]):  # results.probs[0] contém as probabilidades para o primeiro frame
-                class_name = results.names[class_id]
-                confidence = prob.item()  # Probabilidade da classe
+        # Acessando os resultados de classificação
+        if results.names:  # Verificando se o modelo tem classes
+            class_probabilities = results.pandas().xywh[0]  # Pega as probabilidades em formato pandas
 
-                # Definir um limiar de confiança para considerar a classe como detectada
-                if confidence > 0.1:  # Limite de 10%, você pode ajustar conforme necessário
-                    timestamp = frame_count / frame_rate  # Calcular o timestamp baseado no número de quadros
+            for _, row in class_probabilities.iterrows():
+                class_name = row['name']  # Nome da classe
+                confidence = row['confidence']  # Confiança da classe
+
+                if confidence > 0.1:  # Ignora classes com baixa confiança
+                    timestamp = frame_count / frame_rate  # Calcula o timestamp baseado no número de quadros
+
+                    # Armazenar a duração de cada classe
                     if class_name not in class_durations:
                         class_durations[class_name] = {'start': timestamp, 'duration': 0}
-                    class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementar a duração da classe
+                    class_durations[class_name]['duration'] += 1 / frame_rate  # Incrementa a duração
 
                     # Adicionar o nome da classe no frame
                     cv2.putText(frame, f"{class_name}: {confidence*100:.2f}%", 
                                 (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-        # Mostrar o frame no Streamlit
-        stframe.image(frame, channels="BGR", use_container_width=True)
+        # Exibir o frame no Streamlit
+        stframe.image(frame, channels="BGR", use_column_width=True)
 
     cap.release()
-
-    # Remover o arquivo temporário
     os.remove(temp_file_path)
 
-    return class_durations
+    # Exibir a duração de cada classe após o processamento
+    st.write("Duração de cada classe detectada:")
+    for class_name, data in class_durations.items():
+        st.write(f"{class_name}: {data['duration']:.2f} segundos")
 
-# Interface do Streamlit
-st.title("Classificador de Vídeo com YOLO")
-uploaded_file = st.file_uploader("Escolha um arquivo de vídeo", type=["mp4", "avi"])
+# Interface no Streamlit
+st.title("Classificação de Ações em Vídeos")
+uploaded_file = st.file_uploader("Escolha um vídeo", type=["mp4", "mov", "avi"])
 
 if uploaded_file is not None:
-    st.video(uploaded_file)
-    st.write("Processando vídeo...")
-    start_time = time.time()
     durations = process_video(uploaded_file)
-    elapsed_time = time.time() - start_time
-    st.write(f"Processamento concluído em {elapsed_time:.2f} segundos.")
-    st.write("Duração de cada classe detectada (em segundos):")
-    
-    # Exibir as durações das classes detectadas
-    for class_name, times in durations.items():
-        st.write(f"{class_name}: {times['duration']:.2f} segundos")
