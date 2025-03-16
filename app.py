@@ -3,14 +3,21 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import time
+import tempfile
+import os
 
 # Carregar o modelo treinado
 model = YOLO('classW.pt')
 
 # Função para processar o vídeo e classificar cada frame
 def process_video(video_file):
+    # Salvar o vídeo temporariamente
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(video_file.read())
+        temp_file_path = temp_file.name
+
     # Abrir o vídeo
-    cap = cv2.VideoCapture(video_file)
+    cap = cv2.VideoCapture(temp_file_path)
     frame_rate = cap.get(cv2.CAP_PROP_FPS)
     frame_count = 0
     class_durations = {}
@@ -35,6 +42,10 @@ def process_video(video_file):
                 class_durations[top_class]['duration'] += 1 / frame_rate
 
     cap.release()
+
+    # Remover o arquivo temporário
+    os.remove(temp_file_path)
+
     return class_durations
 
 # Interface do Streamlit
