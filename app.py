@@ -7,7 +7,7 @@ import tempfile
 import os
 
 # Carregar o modelo treinado
-model = YOLO('classW.pt')
+model = YOLO("classW.pt")
 
 # Função para processar o vídeo e classificar cada frame
 def process_video(video_file):
