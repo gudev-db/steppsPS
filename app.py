@@ -40,10 +40,12 @@ def process_video(video_file):
         # Detectar a classe da ação no quadro atual
         results = model(frame)  # Detecção no frame (classificação)
         
-        # Obter a classe com maior probabilidade
-        probs = results.probs[0]  # Probabilidades para o primeiro (e único) quadro
-        max_prob_index = probs.argmax()
-        predicted_class = results.names[max_prob_index]  # Nome da classe com maior probabilidade
+        # Extrair os resultados do modelo e pegar as probabilidades
+        df = results.pandas().xywh[0]  # Extrair a classificação do primeiro (único) quadro
+        
+        # Encontrar a classe com maior probabilidade
+        max_prob_row = df.iloc[df['confidence'].idxmax()]
+        predicted_class = max_prob_row['name']  # Nome da classe com maior probabilidade
         
         # Verificar se houve uma mudança na ação
         if predicted_class != current_action:
