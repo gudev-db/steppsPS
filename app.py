@@ -1,94 +1,130 @@
 import streamlit as st
-import cv2
 from ultralytics import YOLO
-from collections import defaultdict
+from PIL import Image
 import tempfile
 import os
+import cv2
+import numpy as np
 
-def load_model(model_path):
-    model = YOLO(model_path)
-    return model
+# Configuração da página
+st.set_page_config(
+    page_title="Iridologia - Detecção de Anel de Tensão",
+    page_icon="👁️",
+    layout="wide"
+)
 
-def process_video(model, video_path):
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        st.error("Erro ao abrir o vídeo. Verifique o formato do arquivo.")
-        return {}
+# Barra lateral
+with st.sidebar:
+    st.title("Configurações")
+    confidence = st.slider("Limite de Confiança", 0.0, 1.0, 0.5, 0.01)
+    model_path = st.text_input("Caminho do Modelo", "best.pt")
+    st.markdown("---")
+    st.markdown("### Como Usar")
+    st.info("1. Faça upload de uma imagem da íris\n2. O sistema detectará automaticamente\n3. Veja o resultado e diagnóstico")
+    st.markdown("---")
+    st.markdown("### Sobre o Anel de Tensão")
+    st.warning("""
+    O anel de tensão (também chamado de anel neurovascular) indica:
+    - **Presente**: Possível estresse crônico ou tensão acumulada
+    - **Ausente**: Níveis normais de tensão""")
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = 0
-    class_appearances = defaultdict(list)
+# Carregar modelo
+@st.cache_resource
+def load_model(path):
+    try:
+        model = YOLO(path)
+        return model
+    except Exception as e:
+        st.error(f"Erro ao carregar modelo: {e}")
+        return None
 
-    video_placeholder = st.empty()
+model = load_model(model_path)
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+# Conteúdo principal
+st.title("👁️ Análise Iridológica - Detecção de Anel de Tensão")
+st.markdown("""
+Este sistema utiliza inteligência artificial para identificar a presença do anel de tensão em imagens da íris,
+um importante marcador na análise iridológica.
+""")
 
-        results = model(frame)
-        annotated_frame = results[0].plot()
+# Upload de imagem
+uploaded_file = st.file_uploader(
+    "Carregue uma foto da íris:",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=False
+)
 
-        video_placeholder.image(annotated_frame, channels="BGR", use_container_width=True)
+if uploaded_file is not None:
+    # Processar imagem
+    image = Image.open(uploaded_file)
+    img_array = np.array(image)
+    
+    # Exibir original
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Íris Original")
+        st.image(image, caption="Sua imagem", use_column_width=True)
+    
+    # Salvar temporariamente
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
+        image.save(temp_file.name)
+        
+        if model is not None:
+            with st.spinner("Analisando íris..."):
+                try:
+                    # Predição
+                    results = model.predict(
+                        source=temp_file.name,
+                        conf=confidence,
+                        save=False
+                    )
+                    
+                    # Processar resultados
+                    with col2:
+                        st.subheader("Resultado da Análise")
+                        
+                        for result in results:
+                            # Desenhar bounding box
+                            annotated_img = img_array.copy()
+                            if result.boxes:
+                                for box in result.boxes:
+                                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                                    cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            
+                            # Mostrar imagem com anotação
+                            st.image(
+                                annotated_img if result.boxes else img_array,
+                                caption="Íris Analisada",
+                                use_column_width=True
+                            )
+                            
+                            # Diagnóstico
+                            if len(result.boxes) > 0:
+                                class_id = int(result.boxes[0].cls)
+                                conf = float(result.boxes[0].conf)
+                                
+                                if class_id == 0:  # True = Anel presente
+                                    st.error(f"🚨 **Resultado**: Anel de Tensão Detectado (confiança: {conf:.2f})")
+                                    st.warning("""
+                                    **Interpretação Iridológica:**
+                                    - Possível estresse crônico
+                                    - Tensão no sistema nervoso
+                                    - Acúmulo de toxinas""")
+                                else:  # False = Anel ausente
+                                    st.success(f"✅ **Resultado**: Sem Anel de Tensão Detectado (confiança: {conf:.2f})")
+                                    st.info("""
+                                    **Interpretação Iridológica:**
+                                    - Níveis normais de tensão
+                                    - Sistema neurovegetativo equilibrado""")
+                            else:
+                                st.warning("Nenhum anel de tensão detectado na imagem")
+                    
+                    # Limpar arquivo temporário
+                    os.unlink(temp_file.name)
+                    
+                except Exception as e:
+                    st.error(f"Erro na análise: {e}")
+else:
+    st.info("Por favor, carregue uma imagem da íris para análise")
 
-        current_time = frame_count / fps
-        highest_confidence_detection = None
-
-        for result in results:
-            for box in result.boxes:
-                confidence = box.conf.item()
-                if highest_confidence_detection is None or confidence > highest_confidence_detection[1]:
-                    class_id = int(box.cls)
-                    class_name = model.names[class_id]
-                    highest_confidence_detection = (class_name, confidence)
-
-        if highest_confidence_detection:
-            class_name = highest_confidence_detection[0]
-            if not class_appearances[class_name] or class_appearances[class_name][-1][1] < current_time:
-                class_appearances[class_name].append([current_time, current_time + 1 / fps])
-            else:
-                class_appearances[class_name][-1][1] = current_time + 1 / fps
-
-        frame_count += 1
-
-    cap.release()
-
-    class_durations = {}
-    for class_name, intervals in class_appearances.items():
-        total_duration = sum(end - start for start, end in intervals)
-        class_durations[class_name] = total_duration
-
-    return class_durations
-
-def main():
-    st.title("Detecção de Classes em Vídeo com YOLOv11")
-
-    model_path = "finalW.pt"  
-    if not os.path.exists(model_path):
-        st.error(f"Modelo não encontrado no caminho: {model_path}")
-        return
-
-    model = load_model(model_path)
-    st.success("Modelo carregado com sucesso!")
-
-    video_file = st.file_uploader("Carregue um vídeo MP4", type=["mp4","avi"])
-    if video_file is not None:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_video:
-            tmp_video.write(video_file.getbuffer())
-            video_path = tmp_video.name
-
-        st.video(video_path)
-
-        if st.button("Processar Vídeo"):
-            with st.spinner("Processando vídeo..."):
-                class_durations = process_video(model, video_path)
-                st.success("Processamento concluído!")
-
-                st.subheader("Duração Total de Cada Classe:")
-                for class_name, duration in class_durations.items():
-                    st.write(f"Classe {class_name}: {duration:.2f} segundos")
-
-            os.unlink(video_path)
-
-if __name__ == "__main__":
-    main()
