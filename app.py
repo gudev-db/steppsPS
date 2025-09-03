@@ -38,7 +38,7 @@ if uploaded_file is not None and model is not None:
         if class_id == 0:  # True = Anel presente
             st.error(f"🚨 Anel de Tensão DETECTADO (confiança: {conf:.2f})")
             annotated_img = results[0].plot()  # Imagem com bbox
-            st.image(annotated_img, caption="Íris com anel de tensão", use_column_width=True)
+            st.image(annotated_img, caption="Íris com anel de tensão", use_container_width=True)
         else:
             st.success(f"✅ Anel de Tensão NÃO DETECTADO (confiança: {conf:.2f})")
             st.image(img, caption="Íris sem anel de tensão", use_column_width=True)
